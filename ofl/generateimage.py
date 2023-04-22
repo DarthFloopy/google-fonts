@@ -2,6 +2,7 @@
 from PIL import Image, ImageFont, ImageDraw
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
@@ -12,26 +13,26 @@ characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 font_files = []
 with open("./font_filenames.txt", "r") as f:
     font_files = f.read().splitlines()
-print(font_files)
-print(len(font_files))
 
 
 
 
 FONT_SIZE = 100
-MAX_PADDING = 0
+MAX_PADDING = 40
 def generate_image(text, font_path):
     font_object = ImageFont.truetype(font_path, FONT_SIZE) # Font has to be a .ttf file
-    word = "W"
 
     fg = "#000000"  # black foreground
     bg = "#FFFFFF"  # white background
 
-    text_width, text_height = font_object.getsize(word)
+    text_width, text_height = font_object.getsize(text)
     image = Image.new('RGBA', (text_width + MAX_PADDING*2, text_height + MAX_PADDING*2), color=bg)
     draw_pad = ImageDraw.Draw(image)
 
-    draw_pad.text((MAX_PADDING, MAX_PADDING-6), word, font=font_object, fill=fg)
+    draw_pad.text((MAX_PADDING, MAX_PADDING-6), text, font=font_object, fill=fg)
+    # draw again but with spacing between letters
+    draw_pad.text((MAX_PADDING, MAX_PADDING-6), text, font=font_object, fill=fg, spacing=10)
+
 
     image = image.convert("L") # Use this if you want to binarize image
     return image
@@ -44,27 +45,29 @@ def crop(array):
     return array
 
 
+# create folder for each font
+for font_file in font_files:
+    font_name = font_file.split("/")[-1].split(".")[0]
+    folder_name = f"images/{font_name}"
+    os.makedirs(folder_name, exist_ok=True)
 
-image = generate_image('W', "./spacegrotesk/SpaceGrotesk[wght].ttf")
+for font_file in font_files:
+    font_name = font_file.split("/")[-1].split(".")[0]
+    for char in characters:
+        image = generate_image(char, font_file)
+        data = np.array(image)
+        data = crop(data)
+        image = Image.fromarray(data)
 
-data = np.array(image)
-# print(data[len(data)//2])
-
-data = crop(data)
-
-# convert the array back to an image
-image = Image.fromarray(data)
-
-
+        file_name = f"images/{font_name}/{char}.png"
+        try:
+            image.save(file_name)
+        except:
+            print(f"Error saving {file_name}")
+            break
 
 
 # plot the image in matplotlib
-plt.imshow(data, cmap='rainbow')
-plt.show()
-
-# data = data / 255.0
-
-file_name = "output.png"
-
-image.save(file_name)
+# plt.imshow(data, cmap='rainbow')
+# plt.show()
 
