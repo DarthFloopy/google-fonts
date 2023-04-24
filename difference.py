@@ -258,14 +258,35 @@ def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_fa
     return image_rmse(window_to_compare_to_image2, image2_data)
 
 
-image1_filename = './ofl/images/FiraSans-Regular/k.png'
-image2_filename = './ofl/images/OpenSans[wdth,wght]/m.png'
+# image1_filename = './ofl/images/FiraSans-Regular/g.png'
+image1_filename = './ofl/images/Lexend[wght]/g.png'
+# image2_filename = './ofl/images/OpenSans[wdth,wght]/g.png'
+image2_filename = './ofl/handwrittenm.png'
+
 
 image1 = Image.open(image1_filename)
 image2 = Image.open(image2_filename)
 
+# image1 = image1.resize((image1.size[0]//3, image1.size[1]//3))
+# image2 = image2.resize((image2.size[0]//3, image2.size[1]//3))
+
+# image1.thumbnail((75,75))
+# image2.thumbnail((75,75))
+image1.thumbnail((30,30))
+image2.thumbnail((30,30))
+
+
+
 image1_data = np.array(image1)
 image2_data = np.array(image2)
+
+image2_data = 255 - image2_data
+image2_data = image2_data[np.any(image2_data, axis=1)]
+image2_data = image2_data[:, np.any(image2_data, axis=0)]
+image2_data = 255 - image2_data
+
+show_image(image1_data)
+show_image(image2_data)
 
 # image1_data = pad(image1_data, (200, 200), (50, 10))
 # image2_data = pad(image2_data, (200, 200), (20, 70))
@@ -280,6 +301,11 @@ import scipy.optimize as opt
 def compare_translated_images(scale_rotate_translate):
     return scaled_rotated_translated_image_rmse3(image1_data, image2_data, scale_rotate_translate[0], scale_rotate_translate[1], scale_rotate_translate[2:])
 
+heights_ratio = image1_data.shape[0] / image2_data.shape[0]
+widths_ratio = image1_data.shape[1] / image2_data.shape[1]
+
+# fit_ratio = min(heights_ratio, widths_ratio, 1)
+
 bounds = [
     # (0, max(image2_data.shape[1], image1_data.shape[1])*2),
     # (0, max(image2_data.shape[0], image1_data.shape[0])*2)
@@ -290,18 +316,15 @@ bounds = [
     # (-image2_data.shape[1], image1_data.shape[1]),
     # (-image2_data.shape[0], image1_data.shape[0])
 
-    (0.7, 1.2),
-    (-pi/3, pi/3),
-    (-2*image2_data.shape[1], 2*image1_data.shape[1]),
-    (-2*image2_data.shape[0], 2*image1_data.shape[0])
+    (0.8*min(heights_ratio, widths_ratio), 1.4*max(heights_ratio, widths_ratio)),
+    (-pi/6, pi/6),
+    (-image2_data.shape[1], image1_data.shape[1]),
+    (-image2_data.shape[0], image1_data.shape[0])
 ]
-
-def f(*x):
-    pass
 
 # result = opt.differential_evolution(compare_translated_images, bounds, popsize=1000, init='sobol', integrality=(True, True), disp=True, workers=-1, x0=(0,0), strategy='randtobest1bin')
 
-result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=40, init='sobol', polish=False)
+result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=50, init='sobol', polish=False, mutation=0.3)
 
 # result = opt.brute(compare_translated_images, bounds, Ns=10, full_output=True)
 # print(translated_image_rmse(image1_data, image2_data, (round(result.x[0]), round(result.x[1])), True))
