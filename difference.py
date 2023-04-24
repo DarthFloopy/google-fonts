@@ -142,7 +142,7 @@ def display_scaled_rotated_translation_diff(image1_data, image2_data, im2_scale_
             # get the pixel value from image2_data
             try:
                 buf[i, j] = f(pixel)
-                print('pixel in bounds: {}'.format(pixel))
+                # print('pixel in bounds: {}'.format(pixel))
             except:
                 print('pixel out of bounds: {}'.format(pixel))
                 print('image2_data.shape: {}'.format(image2_data.shape))
@@ -243,9 +243,12 @@ def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_fa
     # points = np.array([(i*im2_scale_factor + translate[1], j*im2_scale_factor + translate[0]) for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])])
 
     points = np.array([
-        rotate((i*im2_scale_factor + translate[1], j*im2_scale_factor + translate[0]), im2_rotation)
+        rotate((i*im2_scale_factor, j*im2_scale_factor), im2_rotation)
             for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])
     ])
+    # translate each point in points
+    points = np.array([(i + translate[1], j + translate[0]) for i, j in points])
+
     window_to_compare_to_image2 = image1_interpolator(points).reshape(image2_data.shape)
 
     # window_to_compare_to_image2 = np.vectorize(lambda i, j:
@@ -255,8 +258,8 @@ def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_fa
     return image_rmse(window_to_compare_to_image2, image2_data)
 
 
-image1_filename = './ofl/images/OpenSans[wdth,wght]/f.png'
-image2_filename = './ofl/images/FiraSans-Regular/g.png'
+image1_filename = './ofl/images/FiraSans-Regular/k.png'
+image2_filename = './ofl/images/OpenSans[wdth,wght]/m.png'
 
 image1 = Image.open(image1_filename)
 image2 = Image.open(image2_filename)
@@ -287,10 +290,10 @@ bounds = [
     # (-image2_data.shape[1], image1_data.shape[1]),
     # (-image2_data.shape[0], image1_data.shape[0])
 
-    (0.8, 1.2),
-    (0, pi),
-    (-image2_data.shape[1], image1_data.shape[1]),
-    (-image2_data.shape[0], image1_data.shape[0])
+    (0.7, 1.2),
+    (-pi/3, pi/3),
+    (-2*image2_data.shape[1], 2*image1_data.shape[1]),
+    (-2*image2_data.shape[0], 2*image1_data.shape[0])
 ]
 
 def f(*x):
@@ -298,7 +301,7 @@ def f(*x):
 
 # result = opt.differential_evolution(compare_translated_images, bounds, popsize=1000, init='sobol', integrality=(True, True), disp=True, workers=-1, x0=(0,0), strategy='randtobest1bin')
 
-##result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=50, init='sobol')
+result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=40, init='sobol', polish=False)
 
 # result = opt.brute(compare_translated_images, bounds, Ns=10, full_output=True)
 # print(translated_image_rmse(image1_data, image2_data, (round(result.x[0]), round(result.x[1])), True))
@@ -318,14 +321,14 @@ def f(*x):
 # display_translation_diff(image1_data, image2_data, (floor(min_result.x[0]), floor(min_result.x[1])), f'min: {min_result.fun}')
 
 
-# print(result)
+print(result)
 
 # display_translation_diff(image1_data, image2_data, (floor(result.x[0]), floor(result.x[1])))
 # display_scaled_translation_diff(image1_data, image2_data, result.x[0], (floor(result.x[1]), floor(result.x[2])))
 
-# display_scaled_rotated_translation_diff(image1_data, image2_data, result.x[0], result.x[1], (floor(result.x[2]), floor(result.x[3])))
+display_scaled_rotated_translation_diff(image1_data, image2_data, result.x[0], result.x[1], (floor(result.x[2]), floor(result.x[3])))
 
-display_scaled_rotated_translation_diff(image1_data, image2_data, 1, pi*8/6, (60,40))
+# display_scaled_rotated_translation_diff(image1_data, image2_data, 1, pi*8/6, (60,40))
 
 
 show_all_images()
