@@ -41,7 +41,7 @@ def show_all_images():
 
 
 def scale(image, factor, resample=Resampling.BICUBIC):
-    return image.resize((int(image.width * factor), int(image.height * factor)), resample=resample)
+    return image.resize((int(image.width * factor[0]), int(image.height * factor[1])), resample=resample)
 
 
 def pad_to_same_size(image1_data, image2_data):
@@ -112,7 +112,7 @@ def display_scaled_rotated_translation_diff(image1_data, image2_data, im2_scale_
     # 4. use the RegularGridInterpolator to get that pixel value from image2_data and store it in the buffer.
     # 5. crop the buffer
     biggest_dimension = max(image1_data.shape[0], image2_data.shape[0], image1_data.shape[1], image2_data.shape[1])
-    buf_size = int(biggest_dimension*3*max(im2_scale_factor, 1))
+    buf_size = int(biggest_dimension*3*max(im2_scale_factor[0], im2_scale_factor[1], 1))
     buf = 255 - np.zeros((buf_size, buf_size))
 
     x = np.arange(0, image2_data.shape[1])
@@ -130,7 +130,7 @@ def display_scaled_rotated_translation_diff(image1_data, image2_data, im2_scale_
             pixel = rotate(pixel, -im2_rotation)
 
             # then, scale the pixel's coordinate by 1/im2_scale_factor
-            pixel = (pixel[0]/im2_scale_factor, pixel[1]/im2_scale_factor)
+            pixel = (pixel[0]/im2_scale_factor[1], pixel[1]/im2_scale_factor[0])
 
             # finally, round the pixel's coordinate to the nearest integer
             pixel = (floor(pixel[0]), floor(pixel[1]))
@@ -227,7 +227,7 @@ def translated_image_rmse3(image1_data, image2_data, translate, **kwargs):
 def scaled_translated_image_rmse3(image1_data, image2_data, im2_scale_factor, translate):
     image1_interpolator = RegularGridInterpolator((range(image1_data.shape[0]), range(image1_data.shape[1])), image1_data, bounds_error=False, fill_value=255)
 
-    points = np.array([(i*im2_scale_factor + translate[1], j*im2_scale_factor + translate[0]) for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])])
+    points = np.array([(i*im2_scale_factor[1] + translate[1], j*im2_scale_factor[0] + translate[0]) for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])])
     window_to_compare_to_image2 = image1_interpolator(points).reshape(image2_data.shape)
 
     # window_to_compare_to_image2 = np.vectorize(lambda i, j:
@@ -243,7 +243,7 @@ def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_fa
     # points = np.array([(i*im2_scale_factor + translate[1], j*im2_scale_factor + translate[0]) for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])])
 
     points = np.array([
-        rotate((i*im2_scale_factor, j*im2_scale_factor), im2_rotation)
+        rotate((i*im2_scale_factor[1], j*im2_scale_factor[0]), im2_rotation)
             for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])
     ])
     # translate each point in points
@@ -259,7 +259,7 @@ def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_fa
 
 
 # image1_filename = './ofl/images/FiraSans-Regular/g.png'
-image1_filename = './ofl/images/Lexend[wght]/g.png'
+image1_filename = './ofl/images/Lexend[wght]/w.png'
 # image2_filename = './ofl/images/OpenSans[wdth,wght]/g.png'
 image2_filename = './ofl/handwrittenm.png'
 
@@ -299,7 +299,7 @@ show_image(image2_data)
 import scipy.optimize as opt
 
 def compare_translated_images(scale_rotate_translate):
-    return scaled_rotated_translated_image_rmse3(image1_data, image2_data, scale_rotate_translate[0], scale_rotate_translate[1], scale_rotate_translate[2:])
+    return scaled_rotated_translated_image_rmse3(image1_data, image2_data, scale_rotate_translate[0:2], scale_rotate_translate[2], scale_rotate_translate[3:])
 
 heights_ratio = image1_data.shape[0] / image2_data.shape[0]
 widths_ratio = image1_data.shape[1] / image2_data.shape[1]
@@ -316,7 +316,9 @@ bounds = [
     # (-image2_data.shape[1], image1_data.shape[1]),
     # (-image2_data.shape[0], image1_data.shape[0])
 
-    (0.8*min(heights_ratio, widths_ratio), 1.4*max(heights_ratio, widths_ratio)),
+    # (0.8*min(heights_ratio, widths_ratio), 1.4*max(heights_ratio, widths_ratio)),
+    (0.8*widths_ratio, 1.4*widths_ratio),
+    (0.8*heights_ratio, 1.4*heights_ratio),
     (-pi/6, pi/6),
     (-image2_data.shape[1], image1_data.shape[1]),
     (-image2_data.shape[0], image1_data.shape[0])
@@ -324,7 +326,7 @@ bounds = [
 
 # result = opt.differential_evolution(compare_translated_images, bounds, popsize=1000, init='sobol', integrality=(True, True), disp=True, workers=-1, x0=(0,0), strategy='randtobest1bin')
 
-result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=50, init='sobol', polish=False, mutation=0.3)
+result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=50, init='sobol', polish=False, mutation=0.2)
 
 # result = opt.brute(compare_translated_images, bounds, Ns=10, full_output=True)
 # print(translated_image_rmse(image1_data, image2_data, (round(result.x[0]), round(result.x[1])), True))
@@ -349,7 +351,7 @@ print(result)
 # display_translation_diff(image1_data, image2_data, (floor(result.x[0]), floor(result.x[1])))
 # display_scaled_translation_diff(image1_data, image2_data, result.x[0], (floor(result.x[1]), floor(result.x[2])))
 
-display_scaled_rotated_translation_diff(image1_data, image2_data, result.x[0], result.x[1], (floor(result.x[2]), floor(result.x[3])))
+display_scaled_rotated_translation_diff(image1_data, image2_data, result.x[0:2], result.x[2], (floor(result.x[3]), floor(result.x[4])))
 
 # display_scaled_rotated_translation_diff(image1_data, image2_data, 1, pi*8/6, (60,40))
 
