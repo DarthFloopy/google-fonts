@@ -4,6 +4,7 @@ from PIL.Image import Resampling
 import numpy as np
 import matplotlib.pyplot as plt
 from math import *
+import cv2
 
 images = []
 def show_image(image_data, diff=False, title=None):
@@ -62,9 +63,38 @@ def pad_translated(image_data, dimensions, translate=(0, 0)):
 
 
 def image_rmse(image1_data, image2_data):
-    mse = np.power(np.abs(image2_data - image1_data), 2).mean()
-    rmse = sqrt(mse)
-    return rmse
+    # mse = np.power(image2_data - image1_data, 2).mean()
+    # rmse = sqrt(mse)
+    # return rmse
+
+    # print('im1,2 before', image1_data, image2_data)
+    # print(image1_data)
+
+    image1_data = 1 - image1_data/255
+    image2_data = 1 - image2_data/255
+
+    # image1_data = image1_data / 255
+    # image2_data = image2_data / 255
+
+    # calculate overlapping area, and normalize to reference character size
+    sum_combined = (image1_data * image2_data).sum()
+    # sum_im1 = image1_data.shape[0] * image1_data.shape[1]
+    area_im2 = image2_data.sum()
+
+    # print('sum_im1', sum_im1)
+    # # exit()
+    # # print('im1,2 after', image1_data, image2_data)
+    # if sum_combined == 0:
+    #     ...
+    #     # print('sum_combined is 0')
+    # if sum_im1 == 0:
+    #     print('sum_im1 is 0')
+    #     # os.exit()
+    #     return -999999999
+
+    return 1-(sum_combined / area_im2)
+    # return (image1_data * image2_data).sum()
+
 
 # translate is (x,y) as opposed to (row, column)
 def display_translation_diff(image1_data, image2_data, translate, title=None):
@@ -258,9 +288,9 @@ def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_fa
     return image_rmse(window_to_compare_to_image2, image2_data)
 
 
-# image1_filename = './ofl/images/FiraSans-Regular/g.png'
-image1_filename = './ofl/images/Lexend[wght]/w.png'
-# image2_filename = './ofl/images/OpenSans[wdth,wght]/g.png'
+image1_filename = './ofl/images/FiraSans-Regular/8.png'
+# image1_filename = './ofl/images/Lexend[wght]/a.png'
+# image2_filename = './ofl/images/OpenSans[wdth,wght]/b.png'
 image2_filename = './ofl/handwrittenm.png'
 
 
@@ -279,6 +309,12 @@ image2.thumbnail((30,30))
 
 image1_data = np.array(image1)
 image2_data = np.array(image2)
+
+# image1_data = 255 - image1_data
+# print(image1_data.sum())
+
+# exit()
+
 
 image2_data = 255 - image2_data
 image2_data = image2_data[np.any(image2_data, axis=1)]
@@ -320,13 +356,14 @@ bounds = [
     (0.8*widths_ratio, 1.4*widths_ratio),
     (0.8*heights_ratio, 1.4*heights_ratio),
     (-pi/6, pi/6),
+    # (0, pi*2),
     (-image2_data.shape[1], image1_data.shape[1]),
     (-image2_data.shape[0], image1_data.shape[0])
 ]
 
 # result = opt.differential_evolution(compare_translated_images, bounds, popsize=1000, init='sobol', integrality=(True, True), disp=True, workers=-1, x0=(0,0), strategy='randtobest1bin')
 
-result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=50, init='sobol', polish=False, mutation=0.2)
+result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=100, init='sobol', polish=False, mutation=0.15, recombination=0.9)
 
 # result = opt.brute(compare_translated_images, bounds, Ns=10, full_output=True)
 # print(translated_image_rmse(image1_data, image2_data, (round(result.x[0]), round(result.x[1])), True))
@@ -352,6 +389,17 @@ print(result)
 # display_scaled_translation_diff(image1_data, image2_data, result.x[0], (floor(result.x[1]), floor(result.x[2])))
 
 display_scaled_rotated_translation_diff(image1_data, image2_data, result.x[0:2], result.x[2], (floor(result.x[3]), floor(result.x[4])))
+
+# hu_moment1 = cv2.HuMoments(cv2.moments(image1_data)).flatten()
+# hu_moment2 = cv2.HuMoments(cv2.moments(image2_data)).flatten()
+
+# print('hu_moment1', hu_moment1)
+# print('hu_moment2', hu_moment2)
+# # rmse = np.sqrt(np.sum((hu_moment1 - hu_moment2) ** 2))
+# # print('rmse', rmse)
+# diff = hu_moment1 - hu_moment2
+# print('sum of diffs', np.sum(diff))
+# print(1e4*(np.sum(diff)))
 
 # display_scaled_rotated_translation_diff(image1_data, image2_data, 1, pi*8/6, (60,40))
 
