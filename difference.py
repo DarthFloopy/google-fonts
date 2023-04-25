@@ -288,9 +288,9 @@ def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_fa
     return image_rmse(window_to_compare_to_image2, image2_data)
 
 
-image1_filename = './ofl/images/FiraSans-Regular/8.png'
-# image1_filename = './ofl/images/Lexend[wght]/a.png'
-# image2_filename = './ofl/images/OpenSans[wdth,wght]/b.png'
+# image1_filename = './ofl/images/FiraSans-Regular/g.png'
+# image1_filename = './ofl/images/Lexend[wght]/g.png'
+image1_filename = './ofl/images/IBMPlexSans-Regular/g.png'
 image2_filename = './ofl/handwrittenm.png'
 
 
@@ -353,9 +353,9 @@ bounds = [
     # (-image2_data.shape[0], image1_data.shape[0])
 
     # (0.8*min(heights_ratio, widths_ratio), 1.4*max(heights_ratio, widths_ratio)),
-    (0.8*widths_ratio, 1.4*widths_ratio),
-    (0.8*heights_ratio, 1.4*heights_ratio),
-    (-pi/6, pi/6),
+    (0.6*widths_ratio, 1.5*widths_ratio),
+    (0.6*heights_ratio, 1.5*heights_ratio),
+    (-pi/7, pi/7),
     # (0, pi*2),
     (-image2_data.shape[1], image1_data.shape[1]),
     (-image2_data.shape[0], image1_data.shape[0])
@@ -363,7 +363,7 @@ bounds = [
 
 # result = opt.differential_evolution(compare_translated_images, bounds, popsize=1000, init='sobol', integrality=(True, True), disp=True, workers=-1, x0=(0,0), strategy='randtobest1bin')
 
-result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=100, init='sobol', polish=False, mutation=0.15, recombination=0.9)
+result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=80, init='sobol', polish=False, mutation=0.15, recombination=0.95)
 
 # result = opt.brute(compare_translated_images, bounds, Ns=10, full_output=True)
 # print(translated_image_rmse(image1_data, image2_data, (round(result.x[0]), round(result.x[1])), True))
