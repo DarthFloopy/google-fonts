@@ -7,6 +7,7 @@ from math import *
 from skimage.morphology import skeletonize
 from skimage import data
 from skimage.util import invert
+from scipy.interpolate import RegularGridInterpolator
 # # import cv2
 
 images = []
@@ -26,7 +27,7 @@ def show_all_images():
         ax = axs[i] if len(images) > 1 else axs
         ax.set_title(title)
         if diff:
-            ax.imshow(image_data, cmap='PiYG', vmin=-255, vmax=255)
+            ax.imshow(image_data, cmap='PiYG')
         else:
             ax.imshow(image_data, cmap='gray', vmin=0, vmax=255)
     plt.show()
@@ -52,6 +53,56 @@ def pad_translated(image_data, dimensions, translate=(0, 0)):
     padded_image_data = 255 - np.zeros(dimensions)
     padded_image_data[translate[1] : translate[1]+image_data.shape[0] , translate[0] : translate[0]+image_data.shape[1]] = image_data
     return padded_image_data
+
+
+# takes binary (boolean) images
+def skel_image_rmse(image1_data, image2_data):
+    points1 = np.argwhere(image1_data)
+    points2 = np.argwhere(image2_data)
+
+    distances = []
+
+    # for p1 in points1:
+    #     closest = inf
+    #     for p2 in points2:
+    #         distance = hypot(p1[0]-p2[0], p1[1]-p2[1])
+    #         if distance < closest:
+    #             closest = distance
+    #     distances.append(max(0,closest**2-1)/1)  # graph it in desmos to see
+
+    # distances = np.power(distances, 2)
+
+    for p1 in points1:
+        # search in concentric squares for white pixels
+        closest = inf
+        for r in range(1, max(image2_data.shape[0], image2_data.shape[1])):
+            if closest < inf:
+                break
+
+            for i in range(p1[0]-r, p1[0]+r+1):
+                for j in [p1[1]-r, p1[1]+r]:
+                    if j < 0 or j >= image2_data.shape[1]:  # could be optimized
+                        continue
+                    if i < 0 or i >= image2_data.shape[0]:
+                        break
+
+                    if image2_data[i,j]:
+                        closest = min(closest, hypot(i-p1[0], j-p1[1]))
+
+            for i in [p1[0]-r, p1[0]+r]:
+                for j in range(p1[1]-r, p1[1]+r+1):
+                    if j < 0 or j >= image2_data.shape[1]:
+                        continue
+                    if i < 0 or i >= image2_data.shape[0]:
+                        break
+
+                    if image2_data[i,j]:
+                        closest = min(closest, hypot(i-p1[0], j-p1[1]))
+
+        distances.append(closest ** 8)
+
+    return sum(distances) / len(distances)
+
 
 
 # def image_rmse(image1_data, image2_data):
@@ -116,10 +167,10 @@ def pad_translated(image_data, dimensions, translate=(0, 0)):
 #     display_translation_diff(image1_data, np.array(scaled_image2), translate, title)
 
 
-# def rotate(xy, radians):
-#     r, theta = (hypot(xy[0], xy[1]), atan2(xy[1], xy[0]))
-#     theta += radians
-#     return (r * cos(theta), r * sin(theta))
+def rotate(xy, radians):
+    r, theta = (hypot(xy[0], xy[1]), atan2(xy[1], xy[0]))
+    theta += radians
+    return (r * cos(theta), r * sin(theta))
 
 def display_scaled_rotated_translation_diff(image1_data, image2_data, im2_scale_factor, im2_rotation, translate, title=None):
     # scaled_image2 = scale(Image.fromarray(image2_data), im2_scale_factor)
@@ -230,7 +281,6 @@ def display_scaled_rotated_translation_diff(image1_data, image2_data, im2_scale_
 # #     return translated_image_rmse2(image2_data, image1_data, (-translate[0], -translate[1]))
 
 
-# from scipy.interpolate import RegularGridInterpolator
 
 # # translate is (x,y) as opposed to (row, column)
 # def translated_image_rmse3(image1_data, image2_data, translate, **kwargs):
@@ -259,30 +309,30 @@ def display_scaled_rotated_translation_diff(image1_data, image2_data, im2_scale_
 #     return image_rmse(window_to_compare_to_image2, image2_data)
 
 # # translate is (x,y) as opposed to (row, column) and translate is applied after scale
-# def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_factor, im2_rotation, translate):
-#     image1_interpolator = RegularGridInterpolator((range(image1_data.shape[0]), range(image1_data.shape[1])), image1_data, bounds_error=False, fill_value=255)
+def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_factor, im2_rotation, translate):
+    image1_interpolator = RegularGridInterpolator((range(image1_data.shape[0]), range(image1_data.shape[1])), image1_data, bounds_error=False, fill_value=True)
 
-#     # points = np.array([(i*im2_scale_factor + translate[1], j*im2_scale_factor + translate[0]) for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])])
+    # points = np.array([(i*im2_scale_factor + translate[1], j*im2_scale_factor + translate[0]) for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])])
 
-#     points = np.array([
-#         rotate((i*im2_scale_factor[1], j*im2_scale_factor[0]), im2_rotation)
-#             for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])
-#     ])
-#     # translate each point in points
-#     points = np.array([(i + translate[1], j + translate[0]) for i, j in points])
+    points = np.array([
+        rotate((i*im2_scale_factor[1], j*im2_scale_factor[0]), im2_rotation)
+            for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])
+    ])
+    # translate each point in points
+    points = np.array([(i + translate[1], j + translate[0]) for i, j in points])
 
-#     window_to_compare_to_image2 = image1_interpolator(points).reshape(image2_data.shape)
+    window_to_compare_to_image2 = image1_interpolator(points).reshape(image2_data.shape)
 
-#     # window_to_compare_to_image2 = np.vectorize(lambda i, j:
-#     #     image1_interpolator((i + translate[1], j + translate[0]))
-#     # )(range(image2_data.shape[0]), range(image2_data.shape[1]))
+    # window_to_compare_to_image2 = np.vectorize(lambda i, j:
+    #     image1_interpolator((i + translate[1], j + translate[0]))
+    # )(range(image2_data.shape[0]), range(image2_data.shape[1]))
 
-#     return image_rmse(window_to_compare_to_image2, image2_data)
+    return skel_image_rmse(window_to_compare_to_image2, image2_data)
 
 
 # image1_filename = './ofl/images/FiraSans-Regular/g.png'
 # image1_filename = './ofl/images/Lexend[wght]/g.png'
-image1_filename = './ofl/images/IBMPlexSans-Regular/m.png'
+image1_filename = './ofl/images/Fredoka[wdth,wght]/a.png'
 image2_filename = './ofl/handwrittenm.png'
 
 
@@ -294,8 +344,8 @@ image2 = Image.open(image2_filename)
 
 # image1.thumbnail((75,75))
 # image2.thumbnail((75,75))
-# image1.thumbnail((30,30))
-# image2.thumbnail((30,30))
+image1.thumbnail((30,30), Image.NEAREST)
+image2.thumbnail((30,30), Image.NEAREST)
 
 
 
@@ -366,22 +416,52 @@ def binarize(image_data):
     return np.vectorize(lambda x: 0 if x < 255 else 255)(image_data)
 
 bin_image1_data = binarize(image1_data)
-conway_image1_data = run_conwayjr(image1_data)
+# conway_image1_data = run_conwayjr(image1_data)
 # skel_image1_data = skeletonize(image1_data.copy(order='C'))
 bool_bin_image1_data = np.vectorize(lambda x: x < 255)(bin_image1_data)
 bool_bin_image1_data = bool_bin_image1_data.copy(order='C')
 skel_image1_data = skeletonize(bool_bin_image1_data)
 # skel_image1_data = skeletonize(invert(data.horse()))
 
+bin_image2_data = binarize(image2_data)
+bool_bin_image2_data = np.vectorize(lambda x: x < 255)(bin_image2_data)
+bool_bin_image2_data = bool_bin_image2_data.copy(order='C')
+skel_image2_data = skeletonize(bool_bin_image2_data)
+
 print(image1_data)
-print(bool_bin_image1_data)
+# print(bool_bin_image1_data)
 print(skel_image1_data)
+print(skel_image2_data)
 show_image(image1_data)
+show_image(image2_data)
 # show_image(bin_image1_data)
 # show_image(conway_image1_data)
 show_image(skel_image1_data)
+show_image(skel_image2_data)
 
-show_all_images()
+
+
+# def distance(image1_data, image2_data):
+#     points1 = np.argwhere(image1_data)
+#     points2 = np.argwhere(image2_data)
+
+#     distances = []
+
+#     for p1 in points1:
+#         closest = inf
+#         for p2 in points2:
+#             distance = hypot(p1[0]-p2[0], p1[1]-p2[1])
+#             if distance < closest:
+#                 closest = distance
+#         distances.append(closest)
+
+#     return sum(distances) / len(distances)
+
+
+
+
+
+
 
 
 # show_image(image1_data)
@@ -395,38 +475,49 @@ show_all_images()
 
 # # print(translated_image_rmse(image1_data, image2_data, (30, 40)))
 
-# import scipy.optimize as opt
+import scipy.optimize as opt
 
-# def compare_translated_images(scale_rotate_translate):
-#     return scaled_rotated_translated_image_rmse3(image1_data, image2_data, scale_rotate_translate[0:2], scale_rotate_translate[2], scale_rotate_translate[3:])
+def compare_translated_images(scale_rotate_translate):
+    return scaled_rotated_translated_image_rmse3(skel_image1_data, skel_image2_data, scale_rotate_translate[0:2], scale_rotate_translate[2], scale_rotate_translate[3:])
 
-# heights_ratio = image1_data.shape[0] / image2_data.shape[0]
-# widths_ratio = image1_data.shape[1] / image2_data.shape[1]
+heights_ratio = image1_data.shape[0] / image2_data.shape[0]
+widths_ratio = image1_data.shape[1] / image2_data.shape[1]
 
 # # fit_ratio = min(heights_ratio, widths_ratio, 1)
 
-# bounds = [
-#     # (0, max(image2_data.shape[1], image1_data.shape[1])*2),
-#     # (0, max(image2_data.shape[0], image1_data.shape[0])*2)
+bounds = [
+    # (0, max(image2_data.shape[1], image1_data.shape[1])*2),
+    # (0, max(image2_data.shape[0], image1_data.shape[0])*2)
 
-#     # (-image2_data.shape[1]//2, image1_data.shape[1]//2),
-#     # (-image2_data.shape[0]//2, image1_data.shape[0]//2)
+    # (-image2_data.shape[1]//2, image1_data.shape[1]//2),
+    # (-image2_data.shape[0]//2, image1_data.shape[0]//2)
 
-#     # (-image2_data.shape[1], image1_data.shape[1]),
-#     # (-image2_data.shape[0], image1_data.shape[0])
+    # (-image2_data.shape[1], image1_data.shape[1]),
+    # (-image2_data.shape[0], image1_data.shape[0])
 
-#     # (0.8*min(heights_ratio, widths_ratio), 1.4*max(heights_ratio, widths_ratio)),
-#     (0.6*widths_ratio, 1.5*widths_ratio),
-#     (0.6*heights_ratio, 1.5*heights_ratio),
-#     (-pi/7, pi/7),
-#     # (0, pi*2),
-#     (-image2_data.shape[1], image1_data.shape[1]),
-#     (-image2_data.shape[0], image1_data.shape[0])
-# ]
+    # (0.8*min(heights_ratio, widths_ratio), 1.4*max(heights_ratio, widths_ratio)),
+
+    # (0.6*widths_ratio, 1.5*widths_ratio),
+    # (0.6*heights_ratio, 1.5*heights_ratio),
+    # (-pi/7, pi/7),
+    # # (0, pi*2),
+    # (-image2_data.shape[1], image1_data.shape[1]),
+    # (-image2_data.shape[0], image1_data.shape[0])
+
+    (0.8*widths_ratio, 1.8*widths_ratio),
+    (0.6*heights_ratio, 1.3*heights_ratio),
+    (-pi/9, pi/9),
+    (-image2_data.shape[1]//2, image1_data.shape[1]//2),
+    (-image2_data.shape[0]//2, image1_data.shape[0]//2)
+]
 
 # # result = opt.differential_evolution(compare_translated_images, bounds, popsize=1000, init='sobol', integrality=(True, True), disp=True, workers=-1, x0=(0,0), strategy='randtobest1bin')
 
-# result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=80, init='sobol', polish=False, mutation=0.15, recombination=0.95)
+result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=220, init='sobol', polish=True, mutation=0.40, recombination=0.90)
+
+# minimize with scikit minimize function
+# result = opt.minimize(compare_translated_images, (widths_ratio, heights_ratio, 0, 0, 0))
+# result = opt.basinhopping(compare_translated_images, (widths_ratio, heights_ratio, 0, 0, 0), T=5)
 
 # # result = opt.brute(compare_translated_images, bounds, Ns=10, full_output=True)
 # # print(translated_image_rmse(image1_data, image2_data, (round(result.x[0]), round(result.x[1])), True))
@@ -446,12 +537,12 @@ show_all_images()
 # # display_translation_diff(image1_data, image2_data, (floor(min_result.x[0]), floor(min_result.x[1])), f'min: {min_result.fun}')
 
 
-# print(result)
+print(result)
 
 # # display_translation_diff(image1_data, image2_data, (floor(result.x[0]), floor(result.x[1])))
 # # display_scaled_translation_diff(image1_data, image2_data, result.x[0], (floor(result.x[1]), floor(result.x[2])))
 
-# display_scaled_rotated_translation_diff(image1_data, image2_data, result.x[0:2], result.x[2], (floor(result.x[3]), floor(result.x[4])))
+display_scaled_rotated_translation_diff(image1_data, image2_data, result.x[0:2], result.x[2], (floor(result.x[3]), floor(result.x[4])))
 
 # # hu_moment1 = cv2.HuMoments(cv2.moments(image1_data)).flatten()
 # # hu_moment2 = cv2.HuMoments(cv2.moments(image2_data)).flatten()
@@ -467,5 +558,5 @@ show_all_images()
 # # display_scaled_rotated_translation_diff(image1_data, image2_data, 1, pi*8/6, (60,40))
 
 
-# show_all_images()
+show_all_images()
 

@@ -291,9 +291,9 @@ def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_fa
     return image_rmse(window_to_compare_to_image2, image2_data)
 
 
-image1_filename = './ofl/images/FiraSans-Regular/g.png'
-image1_filename = './ofl/images/Lexend[wght]/g.png'
-# image1_filename = './ofl/images/IBMPlexSans-Regular/g.png'
+# image1_filename = './ofl/images/FiraSans-Regular/g.png'
+image1_filename = './ofl/images/Lexend[wght]/m.png'
+image2_filename = './ofl/images/IBMPlexSans-Regular/m.png'
 # image2_filename = './ofl/handwrittenm.png'
 
 
