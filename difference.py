@@ -4,29 +4,23 @@ from PIL.Image import Resampling
 import numpy as np
 import matplotlib.pyplot as plt
 from math import *
+from scipy.interpolate import RegularGridInterpolator
+
+# there was some weird problem with matplotlib not displaying correctly when cv2 was imported
+# comment cv2 things out if there is an issue
 import cv2
 
+
+# matplotlib doesn't like being called multiple times in a program so we are just queueing everything for later
 images = []
+
 def show_image(image_data, diff=False, title=None):
     images.append((image_data, diff, title))
-
-# diffit = False
-# if diffit:
-#     show_diff(image1_data, image2_data)
-
-# showboth = False
-# if showboth:
-#     plt.subplot(1, 2, 1)
-#     plt.imshow(image1_data, cmap='gray')
-#     plt.title('Q')
-#     plt.subplot(1, 2, 2)
-#     plt.imshow(image2_data, cmap='gray')
-#     plt.title('O')
-#     plt.show()
 
 def show_diff(image1_data, image2_data, title=None):
     show_image(image1_data - image2_data, True, title)
 
+# show_all_images() is called at the end of the script to display everything in the queue
 def show_all_images():
     fig, axs = plt.subplots(1, len(images))
     for i in range(len(images)):
@@ -63,12 +57,11 @@ def pad_translated(image_data, dimensions, translate=(0, 0)):
 
 
 def image_rmse(image1_data, image2_data):
-    # mse = np.power(image2_data - image1_data, 2).mean()
-    # rmse = sqrt(mse)
-    # return rmse
+    mse = np.power(image2_data - image1_data, 2).mean()
+    rmse = sqrt(mse)
+    return rmse
 
-    # print('im1,2 before', image1_data, image2_data)
-    # print(image1_data)
+    # wip: some alternate methods that aren't rmse (I was just resuing the method before refactoring)
 
     image1_data = 1 - image1_data/255
     image2_data = 1 - image2_data/255
@@ -78,9 +71,9 @@ def image_rmse(image1_data, image2_data):
 
     # calculate overlapping area, and normalize to reference character size
     sum_combined = (image1_data * image2_data).sum()
-    # sum_im1 = image1_data.shape[0] * image1_data.shape[1]
     area_im2 = image2_data.sum()
 
+    ## debugging
     # print('sum_im1', sum_im1)
     # # exit()
     # # print('im1,2 after', image1_data, image2_data)
@@ -96,32 +89,39 @@ def image_rmse(image1_data, image2_data):
     # return (image1_data * image2_data).sum()
 
 
-# translate is (x,y) as opposed to (row, column)
-def display_translation_diff(image1_data, image2_data, translate, title=None):
-    if translate[0] >= 0 and translate[1] >= 0:
-        total_height = max(image1_data.shape[0], image2_data.shape[0] + translate[1])
-        total_width = max(image1_data.shape[1], image2_data.shape[1] + translate[0])
+# translate is encoded as (x,y) as opposed to (row, column)
 
-        padded_image1_data = pad_translated(image1_data, (total_height, total_width))
-        padded_image2_data = pad_translated(image2_data, (total_height, total_width), translate)
+# I was implementing image processing and the visualizations separately. Here are the methods for displaying stuff
 
-        show_diff(padded_image1_data, padded_image2_data)
+# this section is basically a history of me rewriting things to add more features
+# the current code does not use them and will not work with them as a drop-in replacement
 
-    elif translate[0] >= 0 and translate[1] < 0:
-        total_height = max(image1_data.shape[0] + -translate[1], image2_data.shape[0])
-        total_width = max(image1_data.shape[1], image2_data.shape[1] + translate[0])
+# def display_translation_diff(image1_data, image2_data, translate, title=None):
+#     if translate[0] >= 0 and translate[1] >= 0:
+#         total_height = max(image1_data.shape[0], image2_data.shape[0] + translate[1])
+#         total_width = max(image1_data.shape[1], image2_data.shape[1] + translate[0])
 
-        padded_image1_data = pad_translated(image1_data, (total_height, total_width), (0, -translate[1]))
-        padded_image2_data = pad_translated(image2_data, (total_height, total_width), (translate[0], 0))
+#         padded_image1_data = pad_translated(image1_data, (total_height, total_width))
+#         padded_image2_data = pad_translated(image2_data, (total_height, total_width), translate)
 
-        show_diff(padded_image1_data, padded_image2_data, title)
+#         show_diff(padded_image1_data, padded_image2_data)
 
-    else:
-        display_translation_diff(image2_data, image1_data, (-translate[0], -translate[1]), title)
+#     elif translate[0] >= 0 and translate[1] < 0:
+#         total_height = max(image1_data.shape[0] + -translate[1], image2_data.shape[0])
+#         total_width = max(image1_data.shape[1], image2_data.shape[1] + translate[0])
 
-def display_scaled_translation_diff(image1_data, image2_data, im2_scale_factor, translate, title=None):
-    scaled_image2 = scale(Image.fromarray(image2_data), im2_scale_factor)
-    display_translation_diff(image1_data, np.array(scaled_image2), translate, title)
+#         padded_image1_data = pad_translated(image1_data, (total_height, total_width), (0, -translate[1]))
+#         padded_image2_data = pad_translated(image2_data, (total_height, total_width), (translate[0], 0))
+
+#         show_diff(padded_image1_data, padded_image2_data, title)
+
+#     else:
+#         display_translation_diff(image2_data, image1_data, (-translate[0], -translate[1]), title)
+
+
+# def display_scaled_translation_diff(image1_data, image2_data, im2_scale_factor, translate, title=None):
+#     scaled_image2 = scale(Image.fromarray(image2_data), im2_scale_factor)
+#     display_translation_diff(image1_data, np.array(scaled_image2), translate, title)
 
 
 def rotate(xy, radians):
@@ -129,6 +129,8 @@ def rotate(xy, radians):
     theta += radians
     return (r * cos(theta), r * sin(theta))
 
+# currently in use
+# Note: this doesn't give pixel-perfect accuracy (since it's interpolating the scaling backwards), but it works to visualize what is going on
 def display_scaled_rotated_translation_diff(image1_data, image2_data, im2_scale_factor, im2_rotation, translate, title=None):
     # scaled_image2 = scale(Image.fromarray(image2_data), im2_scale_factor)
     # rotated_image2 = scaled_image2.rotate(degrees(im2_rotation), fillcolor=255)
@@ -238,33 +240,33 @@ def display_scaled_rotated_translation_diff(image1_data, image2_data, im2_scale_
 #     return translated_image_rmse2(image2_data, image1_data, (-translate[0], -translate[1]))
 
 
-from scipy.interpolate import RegularGridInterpolator
+# this section is another bunch of iterations of the same thing
 
 # translate is (x,y) as opposed to (row, column)
-def translated_image_rmse3(image1_data, image2_data, translate, **kwargs):
-    image1_interpolator = RegularGridInterpolator((range(image1_data.shape[0]), range(image1_data.shape[1])), image1_data, bounds_error=False, fill_value=255)
+# def translated_image_rmse3(image1_data, image2_data, translate, **kwargs):
+#     image1_interpolator = RegularGridInterpolator((range(image1_data.shape[0]), range(image1_data.shape[1])), image1_data, bounds_error=False, fill_value=255)
 
-    points = np.array([(i + translate[1], j + translate[0]) for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])])
-    window_to_compare_to_image2 = image1_interpolator(points).reshape(image2_data.shape)
+#     points = np.array([(i + translate[1], j + translate[0]) for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])])
+#     window_to_compare_to_image2 = image1_interpolator(points).reshape(image2_data.shape)
 
-    # window_to_compare_to_image2 = np.vectorize(lambda i, j:
-    #     image1_interpolator((i + translate[1], j + translate[0]))
-    # )(range(image2_data.shape[0]), range(image2_data.shape[1]))
+#     # window_to_compare_to_image2 = np.vectorize(lambda i, j:
+#     #     image1_interpolator((i + translate[1], j + translate[0]))
+#     # )(range(image2_data.shape[0]), range(image2_data.shape[1]))
 
-    return image_rmse(window_to_compare_to_image2, image2_data)
+#     return image_rmse(window_to_compare_to_image2, image2_data)
 
-# translate is (x,y) as opposed to (row, column) and translate is applied after scale
-def scaled_translated_image_rmse3(image1_data, image2_data, im2_scale_factor, translate):
-    image1_interpolator = RegularGridInterpolator((range(image1_data.shape[0]), range(image1_data.shape[1])), image1_data, bounds_error=False, fill_value=255)
+# # translate is (x,y) as opposed to (row, column) and translate is applied after scale
+# def scaled_translated_image_rmse3(image1_data, image2_data, im2_scale_factor, translate):
+#     image1_interpolator = RegularGridInterpolator((range(image1_data.shape[0]), range(image1_data.shape[1])), image1_data, bounds_error=False, fill_value=255)
 
-    points = np.array([(i*im2_scale_factor[1] + translate[1], j*im2_scale_factor[0] + translate[0]) for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])])
-    window_to_compare_to_image2 = image1_interpolator(points).reshape(image2_data.shape)
+#     points = np.array([(i*im2_scale_factor[1] + translate[1], j*im2_scale_factor[0] + translate[0]) for i in range(image2_data.shape[0]) for j in range(image2_data.shape[1])])
+#     window_to_compare_to_image2 = image1_interpolator(points).reshape(image2_data.shape)
 
-    # window_to_compare_to_image2 = np.vectorize(lambda i, j:
-    #     image1_interpolator((i + translate[1], j + translate[0]))
-    # )(range(image2_data.shape[0]), range(image2_data.shape[1]))
+#     # window_to_compare_to_image2 = np.vectorize(lambda i, j:
+#     #     image1_interpolator((i + translate[1], j + translate[0]))
+#     # )(range(image2_data.shape[0]), range(image2_data.shape[1]))
 
-    return image_rmse(window_to_compare_to_image2, image2_data)
+#     return image_rmse(window_to_compare_to_image2, image2_data)
 
 # translate is (x,y) as opposed to (row, column) and translate is applied after scale
 def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_factor, im2_rotation, translate):
@@ -281,6 +283,7 @@ def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_fa
 
     window_to_compare_to_image2 = image1_interpolator(points).reshape(image2_data.shape)
 
+    ## old code that never worked
     # window_to_compare_to_image2 = np.vectorize(lambda i, j:
     #     image1_interpolator((i + translate[1], j + translate[0]))
     # )(range(image2_data.shape[0]), range(image2_data.shape[1]))
@@ -288,10 +291,10 @@ def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_fa
     return image_rmse(window_to_compare_to_image2, image2_data)
 
 
-# image1_filename = './ofl/images/FiraSans-Regular/g.png'
-# image1_filename = './ofl/images/Lexend[wght]/g.png'
-image1_filename = './ofl/images/IBMPlexSans-Regular/g.png'
-image2_filename = './ofl/handwrittenm.png'
+image1_filename = './ofl/images/FiraSans-Regular/g.png'
+image1_filename = './ofl/images/Lexend[wght]/g.png'
+# image1_filename = './ofl/images/IBMPlexSans-Regular/g.png'
+# image2_filename = './ofl/handwrittenm.png'
 
 
 image1 = Image.open(image1_filename)
@@ -310,12 +313,7 @@ image2.thumbnail((30,30))
 image1_data = np.array(image1)
 image2_data = np.array(image2)
 
-# image1_data = 255 - image1_data
-# print(image1_data.sum())
-
-# exit()
-
-
+# crop
 image2_data = 255 - image2_data
 image2_data = image2_data[np.any(image2_data, axis=1)]
 image2_data = image2_data[:, np.any(image2_data, axis=0)]
@@ -342,6 +340,7 @@ widths_ratio = image1_data.shape[1] / image2_data.shape[1]
 
 # fit_ratio = min(heights_ratio, widths_ratio, 1)
 
+# intervals to check for each feature with differential evolution optimization
 bounds = [
     # (0, max(image2_data.shape[1], image1_data.shape[1])*2),
     # (0, max(image2_data.shape[0], image1_data.shape[0])*2)
@@ -353,17 +352,20 @@ bounds = [
     # (-image2_data.shape[0], image1_data.shape[0])
 
     # (0.8*min(heights_ratio, widths_ratio), 1.4*max(heights_ratio, widths_ratio)),
-    (0.6*widths_ratio, 1.5*widths_ratio),
-    (0.6*heights_ratio, 1.5*heights_ratio),
-    (-pi/7, pi/7),
+    (0.6*widths_ratio, 1.5*widths_ratio),  # x scaling
+    (0.6*heights_ratio, 1.5*heights_ratio),  # y scaling
+    (-pi/7, pi/7),  # rotation
     # (0, pi*2),
-    (-image2_data.shape[1], image1_data.shape[1]),
-    (-image2_data.shape[0], image1_data.shape[0])
+    (-image2_data.shape[1], image1_data.shape[1]),  # x translation
+    (-image2_data.shape[0], image1_data.shape[0])  # y translation
 ]
 
 # result = opt.differential_evolution(compare_translated_images, bounds, popsize=1000, init='sobol', integrality=(True, True), disp=True, workers=-1, x0=(0,0), strategy='randtobest1bin')
 
+# the hard work is done by scipy here
 result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=80, init='sobol', polish=False, mutation=0.15, recombination=0.95)
+
+# other things I tried
 
 # result = opt.brute(compare_translated_images, bounds, Ns=10, full_output=True)
 # print(translated_image_rmse(image1_data, image2_data, (round(result.x[0]), round(result.x[1])), True))
@@ -390,6 +392,7 @@ print(result)
 
 display_scaled_rotated_translation_diff(image1_data, image2_data, result.x[0:2], result.x[2], (floor(result.x[3]), floor(result.x[4])))
 
+## Hu Moments are interesting but I didn't spend enough time to determine exactly what they are or whether they are useful
 # hu_moment1 = cv2.HuMoments(cv2.moments(image1_data)).flatten()
 # hu_moment2 = cv2.HuMoments(cv2.moments(image2_data)).flatten()
 
