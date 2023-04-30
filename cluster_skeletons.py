@@ -11,6 +11,8 @@ import tensorflow as tf
 from functools import partial
 import os
 import pandas as pd
+import random
+from sklearn.cluster import KMeans
 
 
 images = []
@@ -32,7 +34,8 @@ def show_all_images():
         if diff:
             ax.imshow(image_data, cmap='PiYG')
         else:
-            ax.imshow(image_data, cmap='gray', vmin=0, vmax=255)
+            # ax.imshow(image_data, cmap='gray', vmin=0, vmax=255)
+            ax.imshow(image_data, cmap='gray')
     plt.show()
 
 
@@ -131,30 +134,42 @@ def bw_ify(image_data):
     return np.vectorize(lambda x: 0 if x < 255 else 255)(image_data)
 
 
+characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+# characters = 'abc'
+
 filenames = []
 for dirname in os.listdir('ofl/images'):
-    print(dirname)
+    # print(dirname)
     for filename in os.listdir(f'ofl/images/{dirname}'):
-        if filename.endswith('a.png') or filename.endswith('b.png') or filename.endswith('c.png'):
-            filenames.append(f'ofl/images/{dirname}/{filename}')
+        for character in characters:
+            if filename == f'{character}.png':
+                filenames.append(f'ofl/images/{dirname}/{filename}')
+                break
 
-print('filenames:', filenames)
+np.random.shuffle(filenames)
+# print('filenames:', filenames)
 
 
 size = 32
 
-def convert_image(filename):
+def get_image_data(filename):
     image = Image.open(filename)
     # image.thumbnail((size, size), Image.Resampling.NEAREST)
     image.thumbnail((size-2, size-2), Image.Resampling.NEAREST)
 
     image_data = np.array(image)
+
+    label = filename.split('/')[-1][0]
+    return label, image_data
+
+def convert_image(image_data):
     bw_image_data = bw_ify(image_data)
 
     bin_image_data = np.vectorize(lambda x: x < 255)(bw_image_data)
     bin_image_data = bin_image_data.copy(order='C')
 
-    skel_image_data = skeletonize(bin_image_data)
+    # skel_image_data = skeletonize(bin_image_data)
+    skel_image_data = bin_image_data
 
     # crop
     skel_image_data = skel_image_data[np.any(skel_image_data, axis=1)]
@@ -165,62 +180,182 @@ def convert_image(filename):
 
     # skel_image_data = np.vectorize(lambda x: 1 if x else 0)(skel_image_data)
 
-    label = filename.split('/')[-1][0]
+    return skel_image_data
 
-    return label, skel_image_data
+
 
 processed_images = []
 labels = []
-for dirname in filenames:
-    processed_images.append(convert_image(dirname)[1])
-    labels.append(convert_image(dirname)[0])
-
-from sklearn.preprocessing import OneHotEncoder
-enc = OneHotEncoder()
-labels = enc.fit_transform(np.array(labels).reshape(-1, 1)).toarray()
+for filename in filenames:
+    label, data = get_image_data(filename)
+    labels.append(label)
+    converted_image = convert_image(data)
+    processed_images.append(converted_image)
 
 
-DefaultConv2D = partial(tf.keras.layers.Conv2D, kernel_size=3, activation="relu", padding="same", kernel_initializer="he_normal")
+# from sklearn.preprocessing import OneHotEncoder
+# enc = OneHotEncoder()
+# labels = enc.fit_transform(np.array(labels).reshape(-1, 1)).toarray()
 
-model = tf.keras.Sequential([
-    DefaultConv2D(filters=64, kernel_size=7, input_shape=[size, size, 1]),
-    tf.keras.layers.MaxPooling2D(pool_size=2),
-    DefaultConv2D(filters=128),
-    DefaultConv2D(filters=128),
-    tf.keras.layers.MaxPooling2D(pool_size=2),
-    DefaultConv2D(filters=256),
-    DefaultConv2D(filters=256),
-    tf.keras.layers.MaxPooling2D(pool_size=2),
-    tf.keras.layers.Flatten(),
-    tf.keras.layers.Dense(units=64, activation="relu", kernel_initializer="he_normal"),
-    tf.keras.layers.Dropout(0.5),
-    tf.keras.layers.Dense(units=64, activation="relu", kernel_initializer="he_normal"),
-    tf.keras.layers.Dropout(0.5),
-    tf.keras.layers.Dense(units=3, activation="softmax")
+from sklearn.preprocessing import LabelEncoder
+enc = LabelEncoder()
+labels = enc.fit_transform(labels)
+
+
+# DefaultConv2D = partial(tf.keras.layers.Conv2D, kernel_size=5, activation="relu", padding="same", kernel_initializer="he_normal")
+
+# model = tf.keras.Sequential([
+#     DefaultConv2D(filters=64, kernel_size=7, input_shape=[size, size, 1]),
+#     DefaultConv2D(filters=64, kernel_size=3, input_shape=[size, size, 1]),
+#     tf.keras.layers.MaxPooling2D(pool_size=2),
+#     DefaultConv2D(filters=128),
+#     DefaultConv2D(filters=128),
+#     tf.keras.layers.MaxPooling2D(pool_size=2),
+#     DefaultConv2D(filters=256),
+#     DefaultConv2D(filters=256),
+#     tf.keras.layers.MaxPooling2D(pool_size=2),
+#     tf.keras.layers.Flatten(),
+#     tf.keras.layers.Dense(units=64, activation="relu", kernel_initializer="he_normal"),
+#     tf.keras.layers.Dropout(0.4),
+#     tf.keras.layers.Dense(units=64, activation="relu", kernel_initializer="he_normal"),
+#     tf.keras.layers.Dense(units=8, activation="relu", kernel_initializer="he_normal"),
+#     tf.keras.layers.Dense(units=64, activation="relu", kernel_initializer="he_normal"),
+#     tf.keras.layers.Dense(units=len(characters), activation="softmax")
+# ])
+# print(model.summary())
+# # tf.keras.utils.plot_model(model, to_file='model.png', show_shapes=True, show_layer_names=True)
+
+# model.compile(loss="categorical_crossentropy", optimizer="sgd", metrics=["accuracy"])
+
+# X_train = processed_images[:int(len(processed_images)*0.8)]
+# y_train = labels[:int(len(processed_images)*0.8)]
+
+# X_valid = processed_images[int(len(processed_images)*0.8):]
+# y_valid = labels[int(len(processed_images)*0.8):]
+
+# print(len(X_train), len(y_train), len(X_valid), len(y_valid))
+# print(X_train[0])
+# print(y_train[0])
+
+# history = model.fit(np.array(X_train), np.array(y_train), epochs=18, validation_data=(np.array(X_valid), np.array(y_valid)))
+
+# pd.DataFrame(history.history).plot(figsize=(8, 5), xlim=[0,29], ylim=[0,1], grid=True, xlabel='Epoch', ylabel='Accuracy', style=["r--", "r--.", "b-", "b-*"])
+# plt.show()
+
+# model.save('print_chars_model', save_format='tf')
+
+# model = tf.keras.models.load_model('print_chars_model')
+
+
+handwrittenm = convert_image(get_image_data('ofl/handwrittenm.png')[1])
+# X_test = [handwrittenm[1]]
+# y_test = [handwrittenm[0]]
+
+
+
+# y_proba = model.predict(np.array(X_test))
+# y_pred = y_proba.argmax(axis=-1)
+# print(y_proba.round(2))
+# print(y_pred)
+# print(np.array([c for c in characters])[y_pred])
+
+
+encoder = tf.keras.Sequential([
+    tf.keras.layers.Dense(32*4),
+    tf.keras.layers.Dense(32),
+    tf.keras.layers.Dense(2)
 ])
-print(model.summary())
-# tf.keras.utils.plot_model(model, to_file='model.png', show_shapes=True, show_layer_names=True)
+decoder = tf.keras.Sequential([
+    tf.keras.layers.Dense(32),
+    tf.keras.layers.Dense(32*4),
+    tf.keras.layers.Dense(32*32)
+])
+autoencoder = tf.keras.Sequential([encoder, decoder])
 
-model.compile(loss="categorical_crossentropy", optimizer="sgd", metrics=["accuracy"])
+optimizer = tf.keras.optimizers.SGD(learning_rate=0.5)
+autoencoder.compile(optimizer=optimizer, loss='mse', metrics=['accuracy'])
 
-X_train = processed_images[:int(len(processed_images)*0.8)]
+# print(np.array(processed_images).shape)
+# min_len = min([len(points) for points in processed_images])
+# print(min_len)
+
+# # shuffle each row of processed_images
+# for i in range(len(processed_images)):
+#     np.random.shuffle(processed_images[i])
+# # drop rows to make all rows the same length
+# normalized_images = np.array([points[:min_len].ravel() for points in processed_images])
+
+
+# X_train = processed_images[:int(len(processed_images)*0.8)]
+X_train = np.array(processed_images[:int(len(processed_images)*0.8)]).reshape(-1, 32*32)
+X_valid = np.array(processed_images[int(len(processed_images)*0.8):]).reshape(-1, 32*32)
+## X_train = np.array(X_train).reshape(-1, 32*32)
+# X_train = normalized_images[:int(len(normalized_images)*0.8)]
 y_train = labels[:int(len(processed_images)*0.8)]
-
-X_valid = processed_images[int(len(processed_images)*0.8):]
 y_valid = labels[int(len(processed_images)*0.8):]
 
-print(len(X_train), len(y_train), len(X_valid), len(y_valid))
-print(X_train[0])
-print(y_train[0])
+history = autoencoder.fit(X_train, X_train, epochs=15, verbose=True, validation_data=(X_valid, X_valid))
+encodings = encoder.predict(X_train)
+print(encodings)
+# codings = encoder.predict(X_train)
 
-history = model.fit(np.array(X_train), np.array(y_train), epochs=15, validation_data=(np.array(X_valid), np.array(y_valid)))
+# pd.DataFrame(history.history).plot(figsize=(8, 5), xlim=[0,29], ylim=[0,1], grid=True, xlabel='Epoch', ylabel='Accuracy', style=["r--", "r--.", "b-", "b-*"])
+# plt.show()
+
+decodings = decoder.predict(encodings)
+
+print(encodings.shape)
+# print(codings[0])
+
+# def points2shape(points):
+#     buf = np.full((32, 32), False)
+#     for point in points:
+#         buf[point[0], point[1]] = True
+#     return buf
+
+# show_image(decodings[0].reshape(32, 32))
+# show_image(X_train[0].reshape(32, 32))
+show_image(X_train[1].reshape(32, 32))
+show_image(decodings[1].reshape(32, 32))
+show_image(handwrittenm.reshape(32, 32))
+
+codings2 = encoder.predict(np.array([handwrittenm.ravel()]))
+decodings2 = decoder.predict(codings2)
+show_image(decodings2[0].reshape(32, 32))
 
 
-pd.DataFrame(history.history).plot(figsize=(8, 5), xlim=[0,29], ylim=[0,1], grid=True, xlabel='Epoch', ylabel='Accuracy', style=["r--", "r--.", "b-", "b-*"])
-plt.show()
+
+# encoded_items = encoder_model(p_items)
+
+# choose number of clusters K:
+# sum_of_squared_distances = []
+# K = range(1,30)
+# for k in K:
+#     km = KMeans(init='k-means++', n_clusters=k, n_init=10)
+#     km.fit(codings)
+#     sum_of_squared_distances.append(km.inertia_)
+
+# plt.plot(K, sum_of_squared_distances, 'bx-')
+# plt.vlines(ymin=0, ymax=150000, x=8, colors='red')
+# plt.text(x=8.2, y=130000, s="optimal K=8")
+# plt.xlabel('Number of Clusters K')
+# plt.ylabel('Sum of squared distances')
+# plt.title('Elbow Method For Optimal K')
+# plt.show()
+
+kmeans = KMeans(init='k-means++', n_clusters=62, n_init=10)
+kmeans.fit(encodings)
+P = kmeans.predict(encodings)
+
+print(P[0])
 
 
-# show_image(skel_image1_data)
 
 # show_all_images()
+
+# plot the clusters
+plt.scatter(encodings[:, 0], encodings[:, 1], c=y_train, s=50, cmap='viridis')
+centers = kmeans.cluster_centers_
+plt.scatter(centers[:, 0], centers[:, 1], c='black', s=200, alpha=0.5)
+plt.show()
 
