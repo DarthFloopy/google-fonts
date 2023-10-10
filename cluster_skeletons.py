@@ -28,6 +28,9 @@ import random
 import tensorflow as tf
 from scipy.optimize import linear_sum_assignment as linear_assignment  # fix for old code
 
+# import matplotlib
+# matplotlib.use('Agg')
+
 # copied from https://www.dlology.com/blog/how-to-do-unsupervised-clustering-with-keras/
 class ClusteringLayer(Layer):
     """

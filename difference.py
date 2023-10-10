@@ -1,4 +1,10 @@
 
+
+# To run this, you'll need to get some images to compare, such as the generated images of fonts' characters, and mess with filename paths so the script will find them.
+# Link to discord message where I posted a generated images tar: https://discord.com/channels/@me/1092879603300827228/1099429390326169671
+# You'll also need to install a few packages (see imports)
+# See the bottom of the script for basic usage of the functions
+
 from PIL import Image
 from PIL.Image import Resampling
 import numpy as np
@@ -8,7 +14,7 @@ from scipy.interpolate import RegularGridInterpolator
 
 # there was some weird problem with matplotlib not displaying correctly when cv2 was imported
 # comment cv2 things out if there is an issue
-import cv2
+# import cv2
 
 
 # matplotlib doesn't like being called multiple times in a program so we are just queueing everything for later
@@ -291,36 +297,44 @@ def scaled_rotated_translated_image_rmse3(image1_data, image2_data, im2_scale_fa
     return image_rmse(window_to_compare_to_image2, image2_data)
 
 
-# image1_filename = './ofl/images/FiraSans-Regular/g.png'
-image1_filename = './ofl/images/Lexend[wght]/m.png'
-image2_filename = './ofl/images/IBMPlexSans-Regular/m.png'
-# image2_filename = './ofl/handwrittenm.png'
 
 
-image1 = Image.open(image1_filename)
-image2 = Image.open(image2_filename)
+
+
+def set_images(image1_input, image2_input):
+    global image1, image2
+    image1 = image1_input
+    image2 = image2_input
+
 
 # image1 = image1.resize((image1.size[0]//3, image1.size[1]//3))
 # image2 = image2.resize((image2.size[0]//3, image2.size[1]//3))
 
 # image1.thumbnail((75,75))
 # image2.thumbnail((75,75))
-image1.thumbnail((30,30))
-image2.thumbnail((30,30))
+def init_images():
+    global image1, image2, image1_data, image2_data
+
+    image1.thumbnail((30,30))
+
+
+    image2_data = np.array(image2)
+
+    # crop
+    image2_data = 255 - image2_data
+    image2_data = image2_data[np.any(image2_data, axis=1)]
+    image2_data = image2_data[:, np.any(image2_data, axis=0)]
+    image2_data = 255 - image2_data
+
+    image2 = Image.fromarray(image2_data)
+    image2.thumbnail((30,30))
+    image2_data = np.array(image2)
 
 
 
-image1_data = np.array(image1)
-image2_data = np.array(image2)
+    image1_data = np.array(image1)
 
-# crop
-image2_data = 255 - image2_data
-image2_data = image2_data[np.any(image2_data, axis=1)]
-image2_data = image2_data[:, np.any(image2_data, axis=0)]
-image2_data = 255 - image2_data
 
-show_image(image1_data)
-show_image(image2_data)
 
 # image1_data = pad(image1_data, (200, 200), (50, 10))
 # image2_data = pad(image2_data, (200, 200), (20, 70))
@@ -335,35 +349,38 @@ import scipy.optimize as opt
 def compare_translated_images(scale_rotate_translate):
     return scaled_rotated_translated_image_rmse3(image1_data, image2_data, scale_rotate_translate[0:2], scale_rotate_translate[2], scale_rotate_translate[3:])
 
-heights_ratio = image1_data.shape[0] / image2_data.shape[0]
-widths_ratio = image1_data.shape[1] / image2_data.shape[1]
+def calculate_result():
+    heights_ratio = image1_data.shape[0] / image2_data.shape[0]
+    widths_ratio = image1_data.shape[1] / image2_data.shape[1]
 
-# fit_ratio = min(heights_ratio, widths_ratio, 1)
+    # fit_ratio = min(heights_ratio, widths_ratio, 1)
 
-# intervals to check for each feature with differential evolution optimization
-bounds = [
-    # (0, max(image2_data.shape[1], image1_data.shape[1])*2),
-    # (0, max(image2_data.shape[0], image1_data.shape[0])*2)
+    # intervals to check for each feature with differential evolution optimization
+    bounds = [
+        # (0, max(image2_data.shape[1], image1_data.shape[1])*2),
+        # (0, max(image2_data.shape[0], image1_data.shape[0])*2)
 
-    # (-image2_data.shape[1]//2, image1_data.shape[1]//2),
-    # (-image2_data.shape[0]//2, image1_data.shape[0]//2)
+        # (-image2_data.shape[1]//2, image1_data.shape[1]//2),
+        # (-image2_data.shape[0]//2, image1_data.shape[0]//2)
 
-    # (-image2_data.shape[1], image1_data.shape[1]),
-    # (-image2_data.shape[0], image1_data.shape[0])
+        # (-image2_data.shape[1], image1_data.shape[1]),
+        # (-image2_data.shape[0], image1_data.shape[0])
 
-    # (0.8*min(heights_ratio, widths_ratio), 1.4*max(heights_ratio, widths_ratio)),
-    (0.6*widths_ratio, 1.5*widths_ratio),  # x scaling
-    (0.6*heights_ratio, 1.5*heights_ratio),  # y scaling
-    (-pi/7, pi/7),  # rotation
-    # (0, pi*2),
-    (-image2_data.shape[1], image1_data.shape[1]),  # x translation
-    (-image2_data.shape[0], image1_data.shape[0])  # y translation
-]
+        # (0.8*min(heights_ratio, widths_ratio), 1.4*max(heights_ratio, widths_ratio)),
+        (0.6*widths_ratio, 1.5*widths_ratio),  # x scaling
+        (0.6*heights_ratio, 1.5*heights_ratio),  # y scaling
+        (-pi/7, pi/7),  # rotation
+        # (0, pi*2),
+        (-image2_data.shape[1], image1_data.shape[1]),  # x translation
+        (-image2_data.shape[0], image1_data.shape[0])  # y translation
+    ]
 
-# result = opt.differential_evolution(compare_translated_images, bounds, popsize=1000, init='sobol', integrality=(True, True), disp=True, workers=-1, x0=(0,0), strategy='randtobest1bin')
+    # result = opt.differential_evolution(compare_translated_images, bounds, popsize=1000, init='sobol', integrality=(True, True), disp=True, workers=-1, x0=(0,0), strategy='randtobest1bin')
 
-# the hard work is done by scipy here
-result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=80, init='sobol', polish=False, mutation=0.15, recombination=0.95)
+    # the hard work is done by scipy here
+    result = opt.differential_evolution(compare_translated_images, bounds, disp=True, workers=-1, popsize=200, init='sobol', polish=False, mutation=0.15, recombination=0.95)
+    return result
+
 
 # other things I tried
 
@@ -384,8 +401,22 @@ result = opt.differential_evolution(compare_translated_images, bounds, disp=True
 # display_translation_diff(image1_data, image2_data, (floor(max_result.x[0]), floor(max_result.x[1])), f'max: {max_result.fun}')
 # display_translation_diff(image1_data, image2_data, (floor(min_result.x[0]), floor(min_result.x[1])), f'min: {min_result.fun}')
 
+# image1_filename = './ofl/images/FiraSans-Regular/g.png'
+image1_filename = './ofl/images/Lexend[wght]/m.png'
+# image2_filename = './ofl/images/IBMPlexSans-Regular/m.png'
+image2_filename = './ofl/handwrittenm.png'
+
+image1 = Image.open(image1_filename)
+image2 = Image.open(image2_filename)
+
+set_images(image1, image2)
+init_images()
+result = calculate_result()
 
 print(result)
+
+show_image(image1_data)
+show_image(image2_data)
 
 # display_translation_diff(image1_data, image2_data, (floor(result.x[0]), floor(result.x[1])))
 # display_scaled_translation_diff(image1_data, image2_data, result.x[0], (floor(result.x[1]), floor(result.x[2])))
